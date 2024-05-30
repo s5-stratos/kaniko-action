@@ -1,5 +1,6 @@
 import * as core from '@actions/core'
 import { run } from './run.js'
+import { multilineKV } from './kvarg.js'
 
 const main = async (): Promise<void> => {
   const outputs = await run({
@@ -18,6 +19,7 @@ const main = async (): Promise<void> => {
     push: core.getBooleanInput('push'),
     tags: core.getMultilineInput('tags'),
     target: core.getInput('target'),
+    extraContext: multilineKV(core.getInput('extra-context'))
   })
   core.setOutput('digest', outputs.digest)
 }
