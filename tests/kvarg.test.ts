@@ -30,3 +30,17 @@ extra=1`
         ['extra', '1']
     ])
 })
+
+// Make sure multiline strings work correctly as the only kv
+test('test quoted single', () => {
+    const input = `"npmrc=registry=https://somewhere
+//more/places==
+"`
+    const result = new Scanner(input, onErrorThrow).readKVs();
+    expect(result).toStrictEqual([
+        ['npmrc', `registry=https://somewhere
+//more/places==
+`]
+    ])
+})
+

@@ -90,6 +90,9 @@ export class Scanner {
     }
 
     private expectNewline() {
+        if (this.offset === this.input.length) {
+            return;
+        }
         if (this.input[this.offset] !== '\n') {
             this.onError('invalid key value string, missing \\n after quoted line')
         }
