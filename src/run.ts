@@ -20,7 +20,7 @@ type Inputs = {
   push: boolean
   tags: string[]
   target: string,
-  extraContext: Array<[string, string]>
+  extraContext: string[]
 }
 
 type Outputs = {
@@ -33,11 +33,7 @@ export const run = async (inputs: Inputs): Promise<Outputs> => {
   )
 
   const runnerTempDir = process.env.RUNNER_TEMP || os.tmpdir()
-  const extraContextDir = await fs.mkdtemp(path.join(runnerTempDir, 'kaniko-extra-context'))
   const outputsDir = await fs.mkdtemp(path.join(runnerTempDir, 'kaniko-action-'))
-
-  // Overwrite the extraContext so instead of [file, value] it becomes [file, path]
-  inputs.extraContext = await writeExtraContext(inputs.extraContext, extraContextDir);
 
   const args = generateArgs(inputs, outputsDir)
   await withTime('Built', () => exec.exec('docker', args))
@@ -45,16 +41,6 @@ export const run = async (inputs: Inputs): Promise<Outputs> => {
   const digest = await readContent(`${outputsDir}/digest`)
   core.info(digest)
   return { digest }
-}
-
-const writeExtraContext = async (extraContexts: Array<[string, string]>, tempDir: string): Promise<Array<[string, string]>> => {
-  const result: Array<[string, string]> = []
-  for (const [key, value] of extraContexts) {
-    const file = path.join(tempDir, key);
-    await fs.writeFile(file, value);
-    result.push([key, file]);
-  }
-  return result;
 }
 
 const withTime = async <T>(message: string, f: () => Promise<T>): Promise<T> => {
@@ -69,22 +55,23 @@ const withTime = async <T>(message: string, f: () => Promise<T>): Promise<T> => 
 export const generateArgs = (inputs: Inputs, outputsDir: string): string[] => {
 
   const args = [
-      // docker args
-      'run',
-      '--rm',
-      '-v',
-      `${path.resolve(inputs.context)}:/kaniko/action/context:ro`,
-      '-v',
-      `${outputsDir}:/kaniko/action/outputs`,
-      '-v',
-      `${os.homedir()}/.docker/:/kaniko/.docker/:ro`,
-      // workaround for kaniko v1.8.0+
-      // https://github.com/GoogleContainerTools/kaniko/issues/1542#issuecomment-1066028047
-      '-e',
-      'container=docker',
+    // docker args
+    'run',
+    '--rm',
+    '-v',
+    `${path.resolve(inputs.context)}:/kaniko/action/context:ro`,
+    '-v',
+    `${outputsDir}:/kaniko/action/outputs`,
+    '-v',
+    `${os.homedir()}/.docker/:/kaniko/.docker/:ro`,
+    // workaround for kaniko v1.8.0+
+    // https://github.com/GoogleContainerTools/kaniko/issues/1542#issuecomment-1066028047
+    '-e',
+    'container=docker',
   ];
-  for (const [filename, path] of inputs.extraContext) {
-    args.push('-v', `${path}:/kaniko/action/extra-context/${filename}`)
+  for (const mount of inputs.extraContext) {
+    const [id, path] = mount.split('=', 2);
+    args.push('-v', `${path}:/kaniko/action/extra-context/${id}:ro`)
   }
   args.push(
     inputs.executor,
